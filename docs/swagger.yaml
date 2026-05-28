@@ -1,0 +1,975 @@
+openapi: 3.0.3
+info:
+  title: FanFare API
+  description: |
+    Pop Culture Prediction & Sentiment Platform Backend API.
+    
+    FanFare enables fans to predict outcomes, track community sentiment,
+    contribute crowdsourced context cards, and build reputation through
+    accurate insights — not follower counts.
+    
+    ## 4 Key Product Pillars
+    1. **Predictions Drive Engagement** — Users predict box office, awards, ratings, story events
+    2. **Sentiment Dashboards Show the Fandom Pulse** — Track hype, satisfaction, controversies over time
+    3. **Context Cards Reduce Misinformation** — Structured crowd-sourced notes clarify truth vs rumor
+    4. **Reputation from Insight, Not Followers** — Points for accurate predictions & helpful contributions
+  version: 1.0.0
+  contact:
+    name: FanFare Team
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /api/v1/auth/login
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [username, email, password]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+          example: "lore_master_jane"
+        email:
+          type: string
+          format: email
+          example: "jane@example.com"
+        password:
+          type: string
+          minLength: 6
+          example: "securepass123"
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: "lore_master_jane"
+        password:
+          type: string
+          example: "securepass123"
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Signed JWT token
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        avatar_url:
+          type: string
+        bio:
+          type: string
+        reputation_score:
+          type: integer
+        followed_universes:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UserProfileStats:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        predictions_attempted:
+          type: integer
+        predictions_correct:
+          type: integer
+        prediction_accuracy:
+          type: number
+          format: float
+        context_cards_added:
+          type: integer
+        context_net_helpful:
+          type: integer
+        polls_voted:
+          type: integer
+        badges:
+          type: array
+          items:
+            type: string
+          example: ["Analyst", "Lore Master"]
+
+    Universe:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [movie, tv, mixed]
+        primary_languages:
+          type: array
+          items:
+            type: string
+        region_tags:
+          type: array
+          items:
+            type: string
+        platforms:
+          type: array
+          items:
+            type: string
+
+    Title:
+      type: object
+      properties:
+        id:
+          type: string
+        universe_id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        release_date:
+          type: string
+        synopsis:
+          type: string
+        poster_art_url:
+          type: string
+        cast_list:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [announced, in_production, released, ended]
+
+    Moment:
+      type: object
+      properties:
+        id:
+          type: string
+        universe_id:
+          type: string
+        title_id:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        type:
+          type: string
+          enum: [official_news, industry_move, rumor_leak, fan_theory]
+        source_urls:
+          type: array
+          items:
+            type: string
+        source_type:
+          type: string
+          enum: [studio, trade, gossip, user]
+
+    IssueHub:
+      type: object
+      properties:
+        id:
+          type: string
+        universe_id:
+          type: string
+        title:
+          type: string
+        slug:
+          type: string
+        overview:
+          type: string
+        timeline:
+          type: array
+          items:
+            type: object
+            properties:
+              moment_id:
+                type: string
+              event_text:
+                type: string
+              date:
+                type: string
+        evidence_stack:
+          type: array
+          items:
+            type: object
+            properties:
+              metric_name:
+                type: string
+              value:
+                type: string
+              type:
+                type: string
+
+    Prediction:
+      type: object
+      properties:
+        id:
+          type: string
+        moment_id:
+          type: string
+        issue_hub_id:
+          type: string
+        question:
+          type: string
+        type:
+          type: string
+          enum: [binary, threshold]
+        options:
+          type: array
+          items:
+            type: string
+        resolution_criteria:
+          type: string
+        status:
+          type: string
+          enum: [open, resolved, cancelled]
+        correct_option:
+          type: string
+        creator_id:
+          type: string
+
+    PredictionVoteRequest:
+      type: object
+      required: [selected_option, confidence]
+      properties:
+        selected_option:
+          type: string
+          example: "Yes (Above $357M)"
+        confidence:
+          type: string
+          enum: [low, medium, high]
+          example: "high"
+
+    PredictionResolveRequest:
+      type: object
+      required: [correct_option, source]
+      properties:
+        correct_option:
+          type: string
+        source:
+          type: string
+          example: "Box Office Mojo official numbers"
+
+    PredictionParticipation:
+      type: object
+      properties:
+        id:
+          type: string
+        prediction_id:
+          type: string
+        user_id:
+          type: string
+        selected_option:
+          type: string
+        confidence:
+          type: string
+        points_awarded:
+          type: integer
+        is_correct:
+          type: boolean
+
+    SentimentPoll:
+      type: object
+      properties:
+        id:
+          type: string
+        issue_hub_id:
+          type: string
+        title_id:
+          type: string
+        type:
+          type: string
+          enum: [hype, support, satisfaction]
+        question:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+
+    SentimentVoteRequest:
+      type: object
+      required: [selected_option, region, age_band]
+      properties:
+        selected_option:
+          type: string
+          example: "Massively Hyped"
+        region:
+          type: string
+          example: "North America"
+        age_band:
+          type: string
+          example: "Gen Z (18-25)"
+
+    ContextCardRequest:
+      type: object
+      required: [whats_accurate, whats_missing, whats_speculative]
+      properties:
+        moment_id:
+          type: string
+        issue_hub_id:
+          type: string
+        prediction_id:
+          type: string
+        whats_accurate:
+          type: string
+          minLength: 10
+        whats_missing:
+          type: string
+          minLength: 10
+        whats_speculative:
+          type: string
+          minLength: 10
+
+    ContextCard:
+      type: object
+      properties:
+        id:
+          type: string
+        moment_id:
+          type: string
+        issue_hub_id:
+          type: string
+        prediction_id:
+          type: string
+        user_id:
+          type: string
+        whats_accurate:
+          type: string
+        whats_missing:
+          type: string
+        whats_speculative:
+          type: string
+        status:
+          type: string
+        helpful_count:
+          type: integer
+        not_helpful_count:
+          type: integer
+        biased_count:
+          type: integer
+
+    ContextCardRateRequest:
+      type: object
+      required: [rating]
+      properties:
+        rating:
+          type: string
+          enum: [helpful, not_helpful, biased]
+
+    FollowFandomRequest:
+      type: object
+      required: [universe_id]
+      properties:
+        universe_id:
+          type: string
+
+    LeaderboardEntry:
+      type: object
+      properties:
+        username:
+          type: string
+        reputation_score:
+          type: integer
+        rank:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      tags: [System]
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+
+  /api/v1/auth/register:
+    post:
+      summary: Register a new user account
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Username or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/auth/login:
+    post:
+      summary: Authenticate and obtain a JWT
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/users/me:
+    get:
+      summary: Get the currently authenticated user's own profile
+      description: Returns the full profile and stats of the token holder — no need to know your own username.
+      tags: [Users]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Authenticated user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileStats'
+        '401':
+          description: Unauthorized — valid JWT required
+
+  /api/v1/users/me/reputation:
+    get:
+      summary: Get the authenticated user's reputation audit trail
+      description: Returns a chronological list of every point-earning action (prediction wins, context contributions, poll votes).
+      tags: [Users]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Reputation history list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    action_type:
+                      type: string
+                      example: "prediction_correct"
+                    points:
+                      type: integer
+                    reference_id:
+                      type: string
+                    created_at:
+                      type: string
+                      format: date-time
+        '401':
+          description: Unauthorized — valid JWT required
+
+  /api/v1/users/{username}:
+    get:
+      summary: Get user profile with stats and badges
+      tags: [Users]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User profile with dynamic stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileStats'
+        '401':
+          description: Unauthorized — valid JWT required
+        '404':
+          description: User not found
+
+  /api/v1/users/follow-fandom:
+    post:
+      summary: Follow a franchise/universe
+      tags: [Users]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FollowFandomRequest'
+      responses:
+        '200':
+          description: Successfully followed
+        '401':
+          description: Unauthorized
+
+  /api/v1/scoreboard:
+    get:
+      summary: Get global or fandom leaderboard
+      tags: [Users]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: universe_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Leaderboard entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeaderboardEntry'
+        '401':
+          description: Unauthorized — valid JWT required
+
+  /api/v1/universes:
+    get:
+      summary: List all pop-culture universes
+      tags: [Universes]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of universes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Universe'
+        '401':
+          description: Unauthorized — valid JWT required
+
+  /api/v1/universes/{slug}:
+    get:
+      summary: Get universe with its titles
+      tags: [Universes]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Universe details with titles
+        '401':
+          description: Unauthorized — valid JWT required
+        '404':
+          description: Universe not found
+
+  /api/v1/titles/{slug}:
+    get:
+      summary: Get title by slug
+      tags: [Titles]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Title details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Title'
+        '401':
+          description: Unauthorized — valid JWT required
+        '404':
+          description: Title not found
+
+  /api/v1/moments:
+    get:
+      summary: Get paginated news feed moments
+      tags: [Moments]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Feed of moments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Moment'
+        '401':
+          description: Unauthorized — valid JWT required
+
+  /api/v1/moments/{id}:
+    get:
+      summary: Get a specific moment
+      tags: [Moments]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Moment details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Moment'
+        '401':
+          description: Unauthorized — valid JWT required
+        '404':
+          description: Moment not found
+
+  /api/v1/moments/{id}/predictions:
+    get:
+      summary: List all predictions attached to a moment
+      description: Returns open and resolved prediction questions linked to this news card
+      tags: [Moments]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of predictions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Prediction'
+        '401':
+          description: Unauthorized — valid JWT required
+        '400':
+          description: Invalid moment ID
+
+  /api/v1/issues:
+    get:
+      summary: List debate hubs
+      tags: [Issues]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [recent, activity]
+            default: recent
+      responses:
+        '200':
+          description: List of issue hubs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IssueHub'
+        '401':
+          description: Unauthorized — valid JWT required
+
+  /api/v1/issues/{slug}:
+    get:
+      summary: Get debate hub with timeline and evidence
+      tags: [Issues]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Issue hub details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssueHub'
+        '401':
+          description: Unauthorized — valid JWT required
+        '404':
+          description: Issue hub not found
+
+  /api/v1/issues/{slug}/predictions:
+    get:
+      summary: List all predictions within an issue hub debate
+      tags: [Issues]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of predictions in this debate
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Prediction'
+        '401':
+          description: Unauthorized — valid JWT required
+        '404':
+          description: Issue hub not found
+
+  /api/v1/predictions/{id}/vote:
+    post:
+      summary: Place a prediction vote
+      tags: [Predictions]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PredictionVoteRequest'
+      responses:
+        '201':
+          description: Vote placed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionParticipation'
+        '400':
+          description: Invalid request or prediction closed
+        '409':
+          description: User already voted
+
+  /api/v1/predictions/{id}/resolve:
+    post:
+      summary: Resolve a prediction (admin)
+      tags: [Predictions]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PredictionResolveRequest'
+      responses:
+        '200':
+          description: Prediction resolved and scores calculated
+        '400':
+          description: Invalid request or already resolved
+
+  /api/v1/sentiment/dashboards/{target_type}/{target_id}:
+    get:
+      summary: Get sentiment dashboard with aggregated metrics
+      tags: [Sentiment]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: target_type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [issue, title]
+        - name: target_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cohort
+          in: query
+          schema:
+            type: string
+            enum: [region, age_band]
+      responses:
+        '200':
+          description: Aggregated sentiment distributions
+        '401':
+          description: Unauthorized — valid JWT required
+
+  /api/v1/sentiment/polls/{id}/vote:
+    post:
+      summary: Submit a sentiment poll vote
+      tags: [Sentiment]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SentimentVoteRequest'
+      responses:
+        '201':
+          description: Vote submitted
+        '409':
+          description: Already voted
+
+  /api/v1/context:
+    post:
+      summary: Submit a context card
+      tags: [Context]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContextCardRequest'
+      responses:
+        '201':
+          description: Context card created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextCard'
+
+  /api/v1/context/{id}/rate:
+    post:
+      summary: Rate a context card
+      tags: [Context]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContextCardRateRequest'
+      responses:
+        '200':
+          description: Rating submitted
+        '409':
+          description: Already rated
